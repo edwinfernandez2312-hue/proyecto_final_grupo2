@@ -1,21 +1,18 @@
-# EXTRAER ARCHIVO CSV DE VENTAS
 import pandas as pd
 
+from config import VENTAS_CSV
+
+
 def extraer_ventas_csv():
-    try:
-        # Leer el archivo CSV de ventas
-        ventas_df = pd.read_csv('../data/ventas_temporal.csv')
+  try:
+    ventas_df = pd.read_csv(VENTAS_CSV)
 
-        # Mostrar el total de registros
-        print("Ventas extraídas correctamente. Total de registros:", len(ventas_df))
-        
-        # Mostrar los 3 primeros registros
-        print("\n--- Primeros 3 registros de Ventas ---")
-        print(ventas_df.head(3))
-        print("--------------------------------------\n")
+    print("Ventas extraídas correctamente. Total de registros:", len(ventas_df))
+    print("\n--- Primeros 3 registros de Ventas ---")
+    print(ventas_df.head(3))
+    print("--------------------------------------\n")
 
-        return ventas_df
-
-    except Exception as e:
-        print(f"Error al extraer el archivo CSV de ventas: {e}")
-        return None
+    return ventas_df
+  except Exception as e:
+    print(f"Error al extraer el archivo CSV de ventas: {e}")
+    return None

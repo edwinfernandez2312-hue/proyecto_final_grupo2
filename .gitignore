@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Salida del pipeline (se regenera con python main.py)
+data/datacommerce_dw.db
+

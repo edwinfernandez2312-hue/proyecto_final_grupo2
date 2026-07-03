@@ -1,0 +1,6 @@
+venta_id,fecha_venta,cliente_id,producto_id,sucursal_id,canal_venta,cantidad,precio_unitario,descuento,total_venta,metodo_pago
+1001,2026-07-01,501,2001,1,Tienda,2,4500,0,9000,Tarjeta
+1002,01/07/2026,502,2002,2,WhatsApp,1,1250,50,1200,Efectivo
+1003,2026/07/02,503,2003,1,Web,3,250,0,750,Transferencia
+1004,2026-07-02,501,2004,3,Tienda,1,890,0,890,Tarjeta
+1005,2026-07-03,504,2002,2,Web,5,1250,125,6125,Transferencia
