@@ -3,7 +3,13 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.venv-1/
+
+# Credenciales y Configuración (¡Secretos que no van a GitHub!)
+data/proyectofinalg2-92ad91289d8e.json
+data/*.json
+.env
+src/.env
 
 # Salida del pipeline (se regenera con python main.py)
 data/datacommerce_dw.db
-
