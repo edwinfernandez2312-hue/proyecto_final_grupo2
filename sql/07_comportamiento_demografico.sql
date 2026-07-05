@@ -1,6 +1,7 @@
 SELECT 
     c.departamento,
     c.genero,
+    c.segmento_cliente, -- Aquí integramos la consulta 21 de tu compañero
     cn.canal_venta,
     mp.metodo_pago,
     COUNT(DISTINCT v.venta_id) AS cantidad_pedidos,
@@ -10,5 +11,5 @@ JOIN `proyectofinalg2.proyectofinalG2.dim_cliente` c ON v.cliente_key = c.client
 JOIN `proyectofinalg2.proyectofinalG2.dim_canal` cn ON v.canal_key = cn.canal_key
 JOIN `proyectofinalg2.proyectofinalG2.dim_metodo_pago` mp ON v.metodo_pago_key = mp.metodo_pago_key
 WHERE c.nombre != 'Cliente no registrado'
-GROUP BY 1, 2, 3, 4
+GROUP BY 1, 2, 3, 4, 5
 ORDER BY ingresos_generados DESC;

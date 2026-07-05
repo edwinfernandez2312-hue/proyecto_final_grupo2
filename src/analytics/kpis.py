@@ -93,14 +93,15 @@ def calcular_resumen_ejecutivo(dict_dfs):
     """
     resumen = {}
     
-    # KPIs de Ventas y Marketing (Tomando el mes más reciente disponible)
+    # KPIs de Ventas y Marketing
     if 'ventas_marketing' in dict_dfs:
         df_vm = generar_kpis_comerciales(dict_dfs['ventas_marketing'])
         if df_vm is not None and not df_vm.empty:
             ultimo_mes = df_vm.iloc[-1]
             resumen['ingresos_totales_mes'] = float(ultimo_mes['ingresos_totales'])
             resumen['roas_actual'] = float(ultimo_mes['roas'])
-            resumen['crecimiento_mom_pct'] = float(ultimo_mes['crecimiento_ingresos_pct'])
+            # Usamos .get por si acaso es nulo en el primer mes
+            resumen['crecimiento_mom_pct'] = float(ultimo_mes.get('crecimiento_ingresos_pct', 0.0))
 
     # KPIs de Rentabilidad Global
     if 'rentabilidad_margen' in dict_dfs:
@@ -112,7 +113,25 @@ def calcular_resumen_ejecutivo(dict_dfs):
     if 'inventario_movimientos' in dict_dfs:
         df_im = dict_dfs['inventario_movimientos']
         resumen['productos_agotados'] = int((df_im['stock_actual'] == 0).sum())
-        
+
+    # --- NUEVO: KPIs de Clientes y Demografía ---
+    if 'top_clientes' in dict_dfs:
+        df_tc = dict_dfs['top_clientes']
+        if not df_tc.empty:
+            # Extraemos el nombre del cliente #1
+            resumen['cliente_top_1'] = str(df_tc.iloc[0]['nombre_cliente'])
+            
+    if 'demografia_canales' in dict_dfs:
+        df_dc = dict_dfs['demografia_canales']
+        if not df_dc.empty:
+            # Agrupamos para descubrir cuál es el canal que más dinero genera
+            mejor_canal = df_dc.groupby('canal_venta')['ingresos_generados'].sum().idxmax()
+            resumen['canal_estrella'] = str(mejor_canal)
+            
+            # Método de pago favorito
+            mejor_pago = df_dc.groupby('metodo_pago')['cantidad_pedidos'].sum().idxmax()
+            resumen['metodo_pago_favorito'] = str(mejor_pago)
+            
     return resumen
 
 def procesar_toda_la_analitica():
@@ -152,25 +171,46 @@ if __name__ == "__main__":
     # Ejecución de la capa analítica completa
     tablas_kpi, KPI_cards = procesar_toda_la_analitica()
     
-    # --- BLOQUE DE VERIFICACIÓN VISUAL DE DATAFRAMES ---
-    if tablas_kpi:
-        print("\n👀 ========================================================")
-        print("🔍 MUESTRA ANALÍTICA (1ª FILA DE CADA DATAFRAME CALCULADO)")
-        print("============================================================")
-        for nombre, df in tablas_kpi.items():
-            print(f"\n📈 [DataFrame: {nombre}] - Dimensiones totales: {df.shape if df is not None else 'Vacío'}")
-            if df is not None and not df.empty:
-                # Mostramos la primera fila formateada sin índices numéricos de Pandas
-                print(df.head(1).to_string(index=False))
-            else:
-                print("⚠️ No hay datos disponibles para esta tabla.")
-        print("\n============================================================\n")
-        
-    # --- BLOQUE DE TARJETAS DE MÉTRICAS MACRO ---
+    # 1. BLOQUE GERENCIAL: Tarjetas de Métricas Macro
     if KPI_cards:
-        print("📊 --- TARJETAS DE KPI PRINCIPALES (RESUMEN EJECUTIVO) ---")
+        print("\n📊 ========================================================")
+        print("   TARJETAS DE KPI PRINCIPALES (RESUMEN EJECUTIVO)")
+        print("============================================================")
         for kpi, valor in KPI_cards.items():
             if isinstance(valor, float):
                 print(f"🔹 {kpi:<30}: {valor:,.2f}")
             else:
                 print(f"🔹 {kpi:<30}: {valor}")
+
+    # 2. BLOQUE COMERCIAL: Clientes y Demografía
+    print("\n👥 ========================================================")
+    print("   ANÁLISIS DE CLIENTES Y COMPORTAMIENTO")
+    print("============================================================")
+    if 'top_clientes' in tablas_kpi and not tablas_kpi['top_clientes'].empty:
+        print("\n🏆 [Top 5 Clientes Estrella]")
+        print(tablas_kpi['top_clientes'].head(5).to_string(index=False))
+        
+    if 'demografia_canales' in tablas_kpi and not tablas_kpi['demografia_canales'].empty:
+        print("\n🗺️ [Top 5 Segmentos Demográficos por Ingreso]")
+        columnas_demo = ['departamento', 'genero', 'segmento_cliente', 'canal_venta', 'ingresos_generados']
+        # Filtramos columnas para que no se desborde la terminal
+        df_demo_mostrar = tablas_kpi['demografia_canales'][[col for col in columnas_demo if col in tablas_kpi['demografia_canales'].columns]]
+        print(df_demo_mostrar.head(5).to_string(index=False))
+
+    # 3. BLOQUE OPERATIVO: Rentabilidad e Inventario
+    print("\n⚙️ ========================================================")
+    print("   ANÁLISIS DE OPERACIONES Y RENTABILIDAD")
+    print("============================================================")
+    if 'rentabilidad_kpi' in tablas_kpi and not tablas_kpi['rentabilidad_kpi'].empty:
+        print("\n💰 [Top 3 Productos más Rentables]")
+        columnas_rent = ['nombre_producto', 'volumen_vendido', 'ganancia_neta', 'categoria_rentabilidad']
+        print(tablas_kpi['rentabilidad_kpi'][columnas_rent].head(3).to_string(index=False))
+
+    if 'inventario_kpi' in tablas_kpi and not tablas_kpi['inventario_kpi'].empty:
+        df_inv = tablas_kpi['inventario_kpi']
+        alertas = df_inv[df_inv['requiere_reabastecimiento_urgente'] == True]
+        print(f"\n📦 [Alertas de Inventario]: {len(alertas)} productos requieren reabastecimiento urgente.")
+        if not alertas.empty:
+            print(alertas[['nombre_producto', 'stock_actual', 'unidades_retiradas']].head(3).to_string(index=False))
+            
+    print("\n============================================================\n")
