@@ -15,9 +15,8 @@ from load.construir_dimensiones import construir_todas_las_dimensiones
 from load.construir_hechos import construir_todas_las_tablas_hecho
 from load.cargar_dw import cargar_data_warehouse
 
-# 1. Importamos la función de BigQuery aquí arriba para mantener el orden limpio
-# Nota: Mantenemos el nombre de tu archivo 'cargar_bigquerry' tal como lo definiste
 from load.cargar_bigquerry import migrar_sqlite_a_bigquery 
+from analytics.kpis import procesar_toda_la_analitica
 
 
 def run_etl_pipeline():
@@ -65,16 +64,29 @@ def run_etl_pipeline():
 
     # --- Carga al Data Warehouse en la Nube (BigQuery) ---
     print("\n--- 5. Sincronización de datos con Google BigQuery ---")
-    
-    # 2. Invocamos aquí la función que sube todo a la nube de manera secuencial
     migrar_sqlite_a_bigquery()
 
-    # 3. Bloque de verificación final en consola para confirmar el éxito de todo el flujo
+    # --- Fase 6: Consultas Analíticas y KPIs ---
+    print("\n--- 6. Cálculo de Consultas Analíticas y KPIs ---")
+    # 2. INVOCAMOS TU FUNCIÓN AQUÍ
+    tablas_kpi, KPI_cards = procesar_toda_la_analitica()
+    
+    # Imprimimos las tarjetas macro si se generaron correctamente
+    if KPI_cards:
+        print("\n📊 --- TARJETAS DE KPI PRINCIPALES (RESUMEN EJECUTIVO) ---")
+        for kpi, valor in KPI_cards.items():
+            if isinstance(valor, float):
+                print(f"🔹 {kpi:<30}: {valor:,.2f}")
+            else:
+                print(f"🔹 {kpi:<30}: {valor}")
+
+    # 3. Bloque de verificación final
     print("\n==================================================================")
     print("🎉 ¡EL PIPELINE DE DATOS SE CUMPLIÓ COMPLETAMENTE CON ÉXITO! 🎉")
     print("   -> Fase 1, 2 y 3: Extracción, Limpieza y Modelo Dimensional [OK]")
     print("   -> Fase 4: Almacenamiento local SQLite Completado           [OK]")
     print("   -> Fase 5: Carga Limpia en BigQuery (Sin Duplicados)        [OK]")
+    print("   -> Fase 6: Cálculo de KPIs con Pandas                       [OK]")
     print("==================================================================")
 
 if __name__ == "__main__":
