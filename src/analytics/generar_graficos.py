@@ -5,7 +5,14 @@ import seaborn as sns
 def crear_dashboards_estaticos(tablas_kpi):
     print("\n🎨 Generando Dashboard Gerencial (Visualización de 14 KPIs)...")
     
-    ruta_reportes = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reportes_visuales"))
+    #
+    if os.path.exists("/opt/airflow"):
+        ruta_reportes = "/opt/airflow/reportes_visuales"
+    else:
+        ruta_reportes = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../../reportes_visuales")
+        )
+
     os.makedirs(ruta_reportes, exist_ok=True)
     sns.set_theme(style="whitegrid")
     paleta = ['#003366', '#008080', '#008B8B', '#4682B4', '#00CED1']

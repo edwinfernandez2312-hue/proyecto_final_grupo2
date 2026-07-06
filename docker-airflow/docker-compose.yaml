@@ -1,0 +1,187 @@
+version: '3.8'
+
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.10.0-python3.12
+
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+
+    PYTHONPATH: /opt/airflow/src
+
+    # Rutas internas del contenedor
+    DATA_DIR: /opt/airflow/data
+    SQL_DIR: /opt/airflow/sql
+    REPORTS_DIR: /opt/airflow/reportes_visuales
+
+    # Credenciales BigQuery dentro del contenedor
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/data/proyectofinalg2-92ad91289d8e.json
+
+    _PIP_ADDITIONAL_REQUIREMENTS: >
+      matplotlib
+      pandas
+      numpy
+      seaborn
+      google-cloud-bigquery
+      db-dtypes
+      openpyxl
+      pandas-gbq
+      pyarrow
+      python-dotenv
+      requests
+
+  volumes:
+    # DAGs
+    - ../dags:/opt/airflow/dags
+
+    # Código fuente
+    - ../src:/opt/airflow/src
+
+    # Data principal para tu config.py
+    # C:\...\proyecto_final_grupo2\data  ->  /opt/airflow/data
+    - ../data:/opt/airflow/data
+
+    # Data adicional para código que busca "../data/datacommerce_dw.db"
+    # Desde /opt/airflow, "../data" equivale a /opt/data
+    - ../data:/opt/data
+
+    # SQL principal
+    # C:\...\proyecto_final_grupo2\sql  ->  /opt/airflow/sql
+    - ../sql:/opt/airflow/sql
+
+    # SQL adicional por si algún script busca "../sql"
+    - ../sql:/opt/sql
+
+    # Reportes / dashboards
+    - ../dashboards:/opt/airflow/reportes_visuales
+    - ../dashboards:/opt/airflow/dashboards
+
+    # Logs de Airflow
+    - ./logs:/opt/airflow/logs
+
+  user: "${AIRFLOW_UID:-50000}:0"
+
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+
+services:
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+
+  redis:
+    image: redis:7.2-bookworm
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
+
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/logs
+        mkdir -p /opt/airflow/reportes_visuales
+        mkdir -p /opt/airflow/dashboards
+        airflow db migrate
+        airflow users create \
+          --username airflow \
+          --password airflow \
+          --firstname Edwin \
+          --lastname Dev \
+          --role Admin \
+          --email admin@test.com || true
+    environment:
+      <<: *airflow-common-env
+    user: "0:0"
+
+
+volumes:
+  postgres-db-volume:

@@ -13,3 +13,6 @@ src/.env
 
 # Salida del pipeline (se regenera con python main.py)
 data/datacommerce_dw.db
+#dockers
+docker-airflow/logs/
+docker-airflow/.env
