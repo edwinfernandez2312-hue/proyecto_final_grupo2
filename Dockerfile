@@ -1,23 +1,26 @@
-# 1. Usamos una imagen ligera de Python
-FROM python:3.11-slim
 
-# 2. Configurar variables de entorno para que los logs salgan en tiempo real
+FROM python:3.11
+
+# 2. Configurar variables de entorno
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# 3. Establecer el directorio de trabajo
+# 3. Directorio de trabajo
 WORKDIR /app
 
-# 4. Copiar e instalar las librerías del proyecto
+# 4. Copiar los requerimientos
 COPY requirements.txt .
+
+# 5. EL ARREGLO: Actualizar pip primero y luego instalar las librerías
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copiar los archivos del proyecto 
+# 6. Copiar los archivos del proyecto
 COPY src/ ./src/
 COPY sql/ ./sql/
 
-# 6. Crear las carpetas locales para la BD SQLite y los reportes gráficos
-RUN mkdir -p /app/data_warehouse /app/reportes_visuales
+# 7. Crear las carpetas
+RUN mkdir -p /app/data_warehouse /app/reportes_visuales /app/secrets
 
-# 7. Ejecutar directamente tu archivo main.py
+# 8. Ejecutar
 CMD ["python", "src/main.py"]
