@@ -13,8 +13,8 @@ COPY requirements.txt .
 # 5. Actualizar pip primero y luego instalar las librerías
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
-# INSTALACIÓN DE GOOGLE:
-RUN pip install --no-cache-dir google-cloud-bigquery google-cloud-bigquery-storage db-dtypes
+# INSTALACIÓN  DE TODAS LAS DEPENDENCIAS CLAVE:
+RUN pip install --no-cache-dir python-dotenv pandas numpy matplotlib seaborn google-cloud-bigquery google-cloud-bigquery-storage db-dtypes
 
 # 6. Copiar los archivos del proyecto
 COPY src/ ./src/
