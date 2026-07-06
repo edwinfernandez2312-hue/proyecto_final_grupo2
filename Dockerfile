@@ -10,9 +10,11 @@ WORKDIR /app
 # 4. Copiar los requerimientos
 COPY requirements.txt .
 
-# 5. EL ARREGLO: Actualizar pip primero y luego instalar las librerías
+# 5. Actualizar pip primero y luego instalar las librerías
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
+# INSTALACIÓN DE GOOGLE:
+RUN pip install --no-cache-dir google-cloud-bigquery google-cloud-bigquery-storage db-dtypes
 
 # 6. Copiar los archivos del proyecto
 COPY src/ ./src/
