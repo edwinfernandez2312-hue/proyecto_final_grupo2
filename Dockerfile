@@ -1,5 +1,4 @@
-
-FROM python:3.11
+FROM python:3.12
 
 # 2. Configurar variables de entorno
 ENV PYTHONUNBUFFERED=1
