@@ -1,18 +1,55 @@
-# Python
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
+**/__pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+
+# Entornos virtuales
 .venv/
 venv/
 .venv-1/
+env/
+ENV/
 
-# Credenciales y Configuración (¡Secretos que no van a GitHub!)
+# ── Credenciales y Secretos (¡NO subir a GitHub!) ─────────────
 data/proyectofinalg2-92ad91289d8e.json
 data/*.json
 .env
 src/.env
+*.json
+!package.json
+!package-lock.json
 
-# Salida del pipeline (se regenera con python main.py)
+# ── Base de datos local (se regenera con main.py) ─────────────
 data/datacommerce_dw.db
-#dockers
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Salidas generadas (dashboards) ───────────────────────────
+dashboards/
+
+# ── Docker ────────────────────────────────────────────────────
 docker-airflow/logs/
 docker-airflow/.env
+
+# ── Jupyter ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# ── IDEs y editores ───────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
