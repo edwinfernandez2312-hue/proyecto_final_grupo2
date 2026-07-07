@@ -1,4 +1,8 @@
 # src/pipeline_manager.py
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 from extract.extraer_productos_excel import extraer_productos_excel
 from extract.extraer_ventas_csv_ import extraer_ventas_csv
 from extract.extraer_clientes_json import extraer_clientes_json
@@ -17,7 +21,6 @@ from load.cargar_dw import cargar_data_warehouse
 from load.cargar_bigquerry import migrar_sqlite_a_bigquery 
 from analytics.kpis import procesar_toda_la_analitica
 from analytics.generar_graficos import crear_dashboards_estaticos
-import sys
 sys.path.append('/opt/airflow/src')
 import pandas as pd
 
@@ -311,18 +314,37 @@ def run_etl_pipeline():
             else:
                 print(f"🔹 {kpi:<30}: {valor}")
 
-    # --- NUEVA FASE 7: Generación de Visualizaciones ---
+    # --- FASE 7: Generación de Visualizaciones ---
+    # --- Fase 7: Generación de Visualizaciones ---
     print("\n--- 7. Generación de Visualizaciones ---")
     if tablas_kpi:
-        # Aquí le pasas el diccionario de DataFrames que obtuviste en la Fase 6
+        # Dashboard estático (seaborn/matplotlib — gráficos separados por área)
         crear_dashboards_estaticos(tablas_kpi)
+
+        # Dashboard ejecutivo PNG (matplotlib — una sola figura)
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import runpy, os as _os
+            _script = _os.path.join(_os.path.dirname(__file__), "analytics", "dashboard_general.py")
+            runpy.run_path(_script, run_name="__main__")
+        except Exception as e:
+            print(f"Error al generar el dashboard general PNG: {e}")
+
+        # Dashboard ejecutivo HTML paginado (Chart.js)
+        try:
+            import runpy, os as _os
+            _script2 = _os.path.join(_os.path.dirname(__file__), "analytics", "generar_dashboard_html.py")
+            runpy.run_path(_script2, run_name="__main__")
+        except Exception as e:
+            print(f"Error al generar el dashboard HTML: {e}")
 
     # 3. Bloque de verificación final
     print("\n==================================================================")
-    print("🎉 ¡EL PIPELINE DE DATOS SE CUMPLIÓ COMPLETAMENTE CON ÉXITO! 🎉")
+    print("EL PIPELINE DE DATOS SE CUMPLIÓ COMPLETAMENTE CON EXITO")
     print("   -> Fase 1-5: Proceso ETL y Carga BigQuery        [OK]")
-    print("   -> Fase 6: Cálculo de KPIs                       [OK]")
-    print("   -> Fase 7: Gráficos exportados en PNG            [OK]")
+    print("   -> Fase 6: Calculo de KPIs                       [OK]")
+    print("   -> Fase 7: Dashboard PNG + Dashboard HTML         [OK]")
     print("==================================================================")
 
 if __name__ == "__main__":

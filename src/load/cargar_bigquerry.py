@@ -3,13 +3,13 @@ import sqlite3
 import pandas as pd
 from google.cloud import bigquery
 from dotenv import load_dotenv
+from config import DW_PATH
 
 # Carga las variables del archivo .env de forma segura
 load_dotenv() 
 
 ID_PROYECTO = os.getenv("ID_PROYECTO")
 DATASET_ID = "proyectofinalG2"
-RUTA_DB = "../data/datacommerce_dw.db"
 
 # 3. Lista ordenada de tus dimensiones y tablas de hechos
 TABLAS_DW = [
@@ -32,16 +32,21 @@ TABLAS_DW = [
 
 def migrar_sqlite_a_bigquery():
     # Validar que la base de datos local exista antes de iniciar
-    if not os.path.exists(RUTA_DB):
-        print(f"❌ Error: No se encontró el archivo de base de datos en: {RUTA_DB}")
+    if not os.path.exists(DW_PATH):
+        print(f"❌ Error: No se encontró el archivo de base de datos en: {DW_PATH}")
         return
 
     # Inicializar el cliente oficial de BigQuery (usa las credenciales del entorno)
-    print("☁️ Inicializando cliente nativo de Google BigQuery...")
-    client = bigquery.Client(project=ID_PROYECTO)
+    try:
+        print("☁️ Inicializando cliente nativo de Google BigQuery...")
+        client = bigquery.Client(project=ID_PROYECTO)
+    except Exception as e:
+        print(f"⚠️ No se pudieron cargar las credenciales de Google BigQuery o el cliente falló: {e}")
+        print("   -> Saltando sincronización con BigQuery. El pipeline continuará usando el Data Warehouse local.")
+        return
 
     print("🔌 Conectando a la base de datos SQLite local...")
-    conexion = sqlite3.connect(RUTA_DB)
+    conexion = sqlite3.connect(DW_PATH)
     
     for tabla in TABLAS_DW:
         print(f"\n──────────────────────────────────────────")

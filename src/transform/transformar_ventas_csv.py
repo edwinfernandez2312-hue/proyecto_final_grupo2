@@ -22,7 +22,28 @@ def transformar_ventas_csv(df_ventas):
   try:
     df = df_ventas.drop_duplicates(subset=["venta_id"], keep="last").copy()
 
-    df["fecha_venta"] = df["fecha_venta"].apply(_parsear_fecha).dt.strftime("%Y-%m-%d")
+    # Vectorized fast datetime conversion
+    fechas = df["fecha_venta"].astype(str).str.strip()
+    parsed_dates = pd.Series(pd.NaT, index=df.index)
+    
+    # 1. Format: YYYY-MM-DD
+    mask1 = fechas.str.contains(r'^\d{4}-\d{2}-\d{2}$', na=False)
+    parsed_dates[mask1] = pd.to_datetime(fechas[mask1], format="%Y-%m-%d", errors="coerce")
+    
+    # 2. Format: YYYY/MM/DD
+    mask2 = fechas.str.contains(r'^\d{4}/\d{2}/\d{2}$', na=False)
+    parsed_dates[mask2] = pd.to_datetime(fechas[mask2], format="%Y/%m/%d", errors="coerce")
+    
+    # 3. Format: DD/MM/YYYY
+    mask3 = fechas.str.contains(r'^\d{1,2}/\d{1,2}/\d{4}$', na=False)
+    parsed_dates[mask3] = pd.to_datetime(fechas[mask3], format="%d/%m/%Y", errors="coerce")
+    
+    # 4. Fallback for others
+    remaining_mask = parsed_dates.isna() & ~fechas.isin(['nan', 'NaN', 'None', ''])
+    if remaining_mask.any():
+        parsed_dates[remaining_mask] = pd.to_datetime(fechas[remaining_mask], errors="coerce", format="mixed")
+        
+    df["fecha_venta"] = parsed_dates.dt.strftime("%Y-%m-%d")
 
     # Estandarizar nombres de canal
     df["canal_venta"] = (

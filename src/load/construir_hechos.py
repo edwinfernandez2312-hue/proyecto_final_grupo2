@@ -166,6 +166,16 @@ def construir_fact_movimientos_inventario(df_movimientos, dimensiones):
 
 
 def construir_fact_marketing(df_marketing, dimensiones):
+    if df_marketing is None or df_marketing.empty:
+        return pd.DataFrame(columns=[
+            "campana_key",
+            "fecha_key",
+            "impresiones",
+            "clics",
+            "costo",
+            "leads",
+            "conversiones",
+        ])
     fact = df_marketing.copy()
 
     dim_campana = dimensiones["dim_campana"]
