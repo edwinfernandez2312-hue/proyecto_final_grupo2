@@ -78,11 +78,11 @@ def generar_kpis_inventario(df_inventario):
     df['ratio_salida_stock'] = np.where(
         df['stock_actual'] > 0,
         df['unidades_retiradas'] / df['stock_actual'],
-        df['unidades_retiradas'] # Si el stock es 0, el riesgo es directo
+        df['unidades_retiradas'] # Si el stock es 0 o negativo, el riesgo es directo
     )
     
     # 2. Variable booleana de riesgo logístico severo
-    df['requiere_reabastecimiento_urgente'] = (df['stock_actual'] == 0) & (df['unidades_retiradas'] > 0)
+    df['requiere_reabastecimiento_urgente'] = (df['stock_actual'] <= 0) & (df['unidades_retiradas'] > 0)
     
     return df
 
@@ -126,7 +126,12 @@ def calcular_resumen_ejecutivo(dict_dfs):
     # KPIs de Operaciones
     if 'inventario_movimientos' in dict_dfs:
         df_im = dict_dfs['inventario_movimientos']
-        resumen['productos_agotados'] = int((df_im['stock_actual'] == 0).sum())
+        if df_im is not None and not df_im.empty:
+            if 'nombre_producto' in df_im.columns:
+                stock_por_producto = df_im.groupby('nombre_producto')['stock_actual'].sum()
+                resumen['productos_agotados'] = int((stock_por_producto <= 0).sum())
+            else:
+                resumen['productos_agotados'] = int((df_im['stock_actual'] <= 0).sum())
 
     if 'ventas_por_canal' in dict_dfs:
         df_vc = dict_dfs['ventas_por_canal']

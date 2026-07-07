@@ -96,6 +96,10 @@ df_mens = query("""
            COUNT(fv.venta_id)   AS transacciones
     FROM fact_ventas fv
     JOIN dim_tiempo dt ON fv.fecha_key = dt.fecha_key
+    WHERE (dt.anio * 100 + dt.mes) <= (
+        CAST(strftime('%Y', 'now', 'start of month', '-1 day') AS INTEGER) * 100
+        + CAST(strftime('%m', 'now', 'start of month', '-1 day') AS INTEGER)
+    )
     GROUP BY dt.anio, dt.mes, dt.nombre_mes
     ORDER BY dt.anio, dt.mes
 """)
@@ -139,6 +143,7 @@ df_inv = query("""
         FROM fact_movimientos_inventario
         WHERE tipo_movimiento='Salida' GROUP BY producto_key
     ) sal ON fi.producto_key = sal.producto_key
+    WHERE fi.existencia > 0
     ORDER BY fi.existencia ASC LIMIT 8
 """)
 
@@ -158,7 +163,15 @@ ticket_prom     = total_ingresos / total_pedidos if total_pedidos else 0.0
 ganancia_total  = float(df_rent["ganancia"].sum())
 margen_prom     = float(df_rent["margen_pct"].mean()) if not df_rent.empty else 0.0
 desc_total      = float(df_mens["descuentos"].sum())
-prod_agotados   = int(query("SELECT COUNT(*) n FROM fact_inventario WHERE existencia=0").iloc[0]["n"])
+prod_agotados   = int(query("""
+    SELECT COUNT(*) n
+    FROM (
+        SELECT producto_key, SUM(existencia) AS stock_total
+        FROM fact_inventario
+        GROUP BY producto_key
+        HAVING stock_total <= 0
+    )
+""").iloc[0]["n"])
 canal_top       = df_canal.iloc[0]["canal"] if not df_canal.empty else "—"
 pago_top        = df_pago.iloc[0]["metodo"]  if not df_pago.empty else "—"
 ingresos_act    = float(df_mens.iloc[-1]["ingresos"]) if not df_mens.empty else 0.0
@@ -389,7 +402,7 @@ ax_iv.barh(y_iv + hw/2, df_iv["salidas"],       height=hw,
             color=AMBER, alpha=0.85, label="Unidades Salidas",   zorder=3)
 
 for i, (st, sa) in enumerate(zip(df_iv["stock_actual"], df_iv["salidas"])):
-    c = ROSE if st == 0 else MUTED
+    c = ROSE if st <= 0 else MUTED
     ax_iv.text(st + max_v * 0.01, i - hw/2, f"{int(st):,}", va="center", fontsize=8, color=c)
     ax_iv.text(sa + max_v * 0.01, i + hw/2, f"{int(sa):,}", va="center", fontsize=8, color=MUTED)
 

@@ -7,11 +7,26 @@ SELECT
     SUM(m.costo) AS inversion_total,
     SUM(m.leads) AS leads_generados,
     SUM(m.conversiones) AS conversiones_totales,
-    -- Métricas calculadas nativas
-    ROUND(SAFE_DIVIDE(SUM(m.clics), SUM(m.impresiones)) * 100, 2) AS click_through_rate_pct,
-    ROUND(SAFE_DIVIDE(SUM(m.costo), SUM(m.conversiones)), 2) AS costo_por_conversion
-FROM `proyectofinalg2.proyectofinalG2.fact_marketing` m
-JOIN `proyectofinalg2.proyectofinalG2.dim_campana` c ON m.campana_key = c.campana_key
-JOIN `proyectofinalg2.proyectofinalG2.dim_tiempo` t ON m.fecha_key = t.fecha_key
-GROUP BY 1, 2, 3
+
+    -- CTR = clics / impresiones * 100
+    ROUND(
+        (SUM(m.clics) * 1.0 / NULLIF(SUM(m.impresiones), 0)) * 100,
+        2
+    ) AS click_through_rate_pct,
+
+    -- Costo por conversión = inversión / conversiones
+    ROUND(
+        SUM(m.costo) * 1.0 / NULLIF(SUM(m.conversiones), 0),
+        2
+    ) AS costo_por_conversion
+
+FROM fact_marketing m
+JOIN dim_campana c 
+    ON m.campana_key = c.campana_key
+JOIN dim_tiempo t 
+    ON m.fecha_key = t.fecha_key
+GROUP BY 
+    t.anio,
+    t.nombre_mes,
+    c.plataforma
 ORDER BY inversion_total DESC;

@@ -55,9 +55,17 @@ df_canal = q("""
 
 df_mens = q("""
     SELECT dt.anio, dt.mes, dt.nombre_mes,
-           SUM(fv.total_venta) AS ingresos, SUM(fv.descuento) AS descuentos, COUNT(fv.venta_id) AS transacciones
-    FROM fact_ventas fv JOIN dim_tiempo dt ON fv.fecha_key=dt.fecha_key
-    GROUP BY dt.anio, dt.mes, dt.nombre_mes ORDER BY dt.anio, dt.mes
+           SUM(fv.total_venta) AS ingresos,
+           SUM(fv.descuento) AS descuentos,
+           COUNT(fv.venta_id) AS transacciones
+    FROM fact_ventas fv
+    JOIN dim_tiempo dt ON fv.fecha_key=dt.fecha_key
+    WHERE (dt.anio * 100 + dt.mes) <= (
+        CAST(strftime('%Y', 'now', 'start of month', '-1 day') AS INTEGER) * 100
+        + CAST(strftime('%m', 'now', 'start of month', '-1 day') AS INTEGER)
+    )
+    GROUP BY dt.anio, dt.mes, dt.nombre_mes
+    ORDER BY dt.anio, dt.mes
 """)
 df_mens["label"] = df_mens["nombre_mes"].str[:3] + " " + df_mens["anio"].astype(str)
 
@@ -87,6 +95,7 @@ df_inv = q("""
     JOIN dim_bodega   db ON fi.bodega_key=db.bodega_key
     LEFT JOIN (SELECT producto_key, SUM(cantidad) AS salidas FROM fact_movimientos_inventario
                WHERE tipo_movimiento='Salida' GROUP BY producto_key) sal ON fi.producto_key=sal.producto_key
+    WHERE fi.existencia > 0
     ORDER BY fi.existencia ASC LIMIT 12
 """)
 
@@ -110,7 +119,15 @@ ticket_prom = total_ing / total_ped if total_ped else 0
 gan_total   = float(df_rent["ganancia"].sum())
 margen_prom = float(df_rent["margen_pct"].mean()) if not df_rent.empty else 0
 desc_total  = float(df_mens["descuentos"].sum())
-agotados    = int(q("SELECT COUNT(*) n FROM fact_inventario WHERE existencia=0").iloc[0]["n"])
+agotados    = int(q("""
+    SELECT COUNT(*) n
+    FROM (
+        SELECT producto_key, SUM(existencia) AS stock_total
+        FROM fact_inventario
+        GROUP BY producto_key
+        HAVING stock_total <= 0
+    )
+""").iloc[0]["n"])
 canal_top   = df_canal.iloc[0]["canal"] if not df_canal.empty else "—"
 pago_top    = df_pago.iloc[0]["metodo"]  if not df_pago.empty else "—"
 ing_act     = float(df_mens.iloc[-1]["ingresos"]) if not df_mens.empty else 0
@@ -820,7 +837,7 @@ function renderRentabilidad(){
 
 // ─── INVENTARIO ───────────────────────────────────────────────
 function renderInventario(){
-  const totalStock = D_INV.reduce((a,r)=>a+(r.stock_actual||0),0);
+  const totalStock = D_INV.reduce((a,r)=>a+Math.max((r.stock_actual||0),0),0);
   const totalSal   = D_INV.reduce((a,r)=>a+(r.salidas||0),0);
   document.getElementById('stat-inv').innerHTML = [
     {l:'Stock Total (muestra)',  v:fmtN(totalStock),       c:C.blue},
@@ -854,7 +871,7 @@ function buildInvTable(data){
   document.getElementById('tbl-inv-body').innerHTML = data.map(r=>{
     const s = r.stock_actual||0;
     let pill, cls;
-    if(s===0){pill='Agotado';cls='pill-red';}
+    if(s<=0){pill='Agotado';cls='pill-red';}
     else if(s<50){pill='Crítico';cls='pill-amber';}
     else{pill='Estable';cls='pill-green';}
     return `<tr>
