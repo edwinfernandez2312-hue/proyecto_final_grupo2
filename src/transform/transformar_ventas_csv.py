@@ -1,70 +1,40 @@
 import pandas as pd
 
+from transform.normalizacion import normalizar_canal_venta, normalizar_metodo_pago, normalizar_fecha_iso
 
-def _parsear_fecha(valor):
-  texto = str(valor).strip()
-  if not texto or texto.lower() == "nan":
-    return pd.NaT
 
-  if "-" in texto and len(texto.split("-")[0]) == 4:
-    return pd.to_datetime(texto, format="%Y-%m-%d", errors="coerce")
+def _parsear_fechas_vectorizado(serie):
+  texto = serie.astype(str).str.strip()
+  texto = texto.replace({"nan": pd.NA, "None": pd.NA, "": pd.NA})
 
-  if "/" in texto:
-    partes = texto.split("/")
-    if len(partes[0]) == 4:
-      return pd.to_datetime(texto, format="%Y/%m/%d", errors="coerce")
-    return pd.to_datetime(texto, format="%d/%m/%Y", errors="coerce")
+  iso = pd.to_datetime(texto, format="%Y-%m-%d", errors="coerce")
+  dmy = pd.to_datetime(texto, format="%d/%m/%Y", errors="coerce")
+  ymd = pd.to_datetime(texto, format="%Y/%m/%d", errors="coerce")
+  dmy2 = pd.to_datetime(texto, format="%m/%d/%Y", errors="coerce")
+  dmy3 = pd.to_datetime(texto, format="%d-%m-%Y", errors="coerce")
 
-  return pd.to_datetime(texto, errors="coerce")
+  return iso.fillna(dmy).fillna(ymd).fillna(dmy2).fillna(dmy3)
 
 
 def transformar_ventas_csv(df_ventas):
   try:
     df = df_ventas.drop_duplicates(subset=["venta_id"], keep="last").copy()
 
-    # Vectorized fast datetime conversion
-    fechas = df["fecha_venta"].astype(str).str.strip()
-    parsed_dates = pd.Series(pd.NaT, index=df.index)
-    
-    # 1. Format: YYYY-MM-DD
-    mask1 = fechas.str.contains(r'^\d{4}-\d{2}-\d{2}$', na=False)
-    parsed_dates[mask1] = pd.to_datetime(fechas[mask1], format="%Y-%m-%d", errors="coerce")
-    
-    # 2. Format: YYYY/MM/DD
-    mask2 = fechas.str.contains(r'^\d{4}/\d{2}/\d{2}$', na=False)
-    parsed_dates[mask2] = pd.to_datetime(fechas[mask2], format="%Y/%m/%d", errors="coerce")
-    
-    # 3. Format: DD/MM/YYYY
-    mask3 = fechas.str.contains(r'^\d{1,2}/\d{1,2}/\d{4}$', na=False)
-    parsed_dates[mask3] = pd.to_datetime(fechas[mask3], format="%d/%m/%Y", errors="coerce")
-    
-    # 4. Fallback for others
-    remaining_mask = parsed_dates.isna() & ~fechas.isin(['nan', 'NaN', 'None', ''])
-    if remaining_mask.any():
-        parsed_dates[remaining_mask] = pd.to_datetime(fechas[remaining_mask], errors="coerce", format="mixed")
-        
-    df["fecha_venta"] = parsed_dates.dt.strftime("%Y-%m-%d")
+    df["fecha_venta"] = normalizar_fecha_iso(_parsear_fechas_vectorizado(df["fecha_venta"]))
 
-    # Estandarizar nombres de canal
-    df["canal_venta"] = (
-      df["canal_venta"]
-      .astype(str)
-      .str.strip()
-      .str.title()
-      .replace({"Web": "E-commerce"})
-    )
-
-    df["metodo_pago"] = df["metodo_pago"].fillna("No disponible")
+    df["canal_venta"] = df["canal_venta"].apply(normalizar_canal_venta)
+    df["metodo_pago"] = df["metodo_pago"].apply(normalizar_metodo_pago)
 
     for col in ["cantidad", "precio_unitario", "descuento", "total_venta"]:
       df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df = df.dropna(subset=["venta_id", "cliente_id", "producto_id", "fecha_venta"])
 
-    print("✅ Limpieza de Ventas completada.")
-    print("\n--- Primeros 3 registros de Ventas (Limpias) ---")
-    print(df.head(3))
-    print("------------------------------------------------\n")
+    print(f"✅ Limpieza de Ventas completada. Registros válidos: {len(df):,}")
+    if len(df) <= 10:
+      print("\n--- Primeros registros de Ventas (Limpias) ---")
+      print(df.head(3))
+      print("------------------------------------------------\n")
 
     return df
   except Exception as e:

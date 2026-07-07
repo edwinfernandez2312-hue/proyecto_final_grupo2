@@ -14,13 +14,12 @@ from transform.transformar_productos_excel import transformar_productos_excel
 from transform.transformar_ventas_csv import transformar_ventas_csv
 from transform.transformar_inventario_db import transformar_inventario_db
 from transform.transformar_marketing_api import transformar_marketing_api
+from transform.normalizacion import limpiar_existencia_serie, normalizar_fecha_iso
 
 from load.construir_dimensiones import construir_todas_las_dimensiones
 from load.construir_hechos import construir_todas_las_tablas_hecho
 from load.cargar_dw import cargar_data_warehouse
-from load.cargar_bigquerry import migrar_sqlite_a_bigquery 
 from analytics.kpis import procesar_toda_la_analitica
-from analytics.generar_graficos import crear_dashboards_estaticos
 sys.path.append('/opt/airflow/src')
 import pandas as pd
 
@@ -110,11 +109,7 @@ def aplicar_parche_dataset_masivo(
         df_ventas = df_ventas.copy()
 
         if "fecha_venta" in df_ventas.columns:
-            df_ventas["fecha_venta"] = pd.to_datetime(
-                df_ventas["fecha_venta"],
-                errors="coerce",
-                format="mixed"
-            )
+            df_ventas["fecha_venta"] = normalizar_fecha_iso(df_ventas["fecha_venta"])
 
         ids_ventas = [
             "venta_id",
@@ -161,7 +156,7 @@ def aplicar_parche_dataset_masivo(
 
         for col in ["existencia", "stock", "stock_actual"]:
             if col in df_inv.columns:
-                df_inv[col] = pd.to_numeric(df_inv[col], errors="coerce").fillna(0).astype("int64")
+                df_inv[col] = limpiar_existencia_serie(df_inv[col])
 
     # =========================
     # MOVIMIENTOS INVENTARIO
@@ -171,11 +166,7 @@ def aplicar_parche_dataset_masivo(
 
         for fecha_col in ["fecha_movimiento", "fecha"]:
             if fecha_col in df_mov.columns:
-                df_mov[fecha_col] = pd.to_datetime(
-                    df_mov[fecha_col],
-                    errors="coerce",
-                    format="mixed"
-                )
+                df_mov[fecha_col] = normalizar_fecha_iso(df_mov[fecha_col])
 
         ids_mov = [
             "movimiento_id",
@@ -210,11 +201,7 @@ def aplicar_parche_dataset_masivo(
             df_mkt = df_mkt.rename(columns={"campaña_id": "campana_id"})
 
         if "fecha" in df_mkt.columns:
-            df_mkt["fecha"] = pd.to_datetime(
-                df_mkt["fecha"],
-                errors="coerce",
-                format="mixed"
-            )
+            df_mkt["fecha"] = normalizar_fecha_iso(df_mkt["fecha"])
 
         if "campana_id" in df_mkt.columns:
             df_mkt["campana_id"] = pd.to_numeric(df_mkt["campana_id"], errors="coerce")
@@ -298,7 +285,11 @@ def run_etl_pipeline():
 
     # --- Carga al Data Warehouse en la Nube (BigQuery) ---
     print("\n--- 5. Sincronización de datos con Google BigQuery ---")
-    migrar_sqlite_a_bigquery()
+    try:
+        from load.cargar_bigquerry import migrar_sqlite_a_bigquery
+        migrar_sqlite_a_bigquery()
+    except ImportError:
+        print("⚠️ Google BigQuery no está instalado. Se omite la sincronización en la nube.")
 
     # --- Fase 6: Consultas Analíticas y KPIs ---
     print("\n--- 6. Cálculo de Consultas Analíticas y KPIs ---")
@@ -318,8 +309,11 @@ def run_etl_pipeline():
     # --- Fase 7: Generación de Visualizaciones ---
     print("\n--- 7. Generación de Visualizaciones ---")
     if tablas_kpi:
-        # Dashboard estático (seaborn/matplotlib — gráficos separados por área)
-        crear_dashboards_estaticos(tablas_kpi)
+        try:
+            from analytics.generar_graficos import crear_dashboards_estaticos
+            crear_dashboards_estaticos(tablas_kpi)
+        except ImportError:
+            print("⚠️ Matplotlib no está instalado. Se omiten los gráficos estáticos.")
 
         # Dashboard ejecutivo PNG (matplotlib — una sola figura)
         try:

@@ -1,5 +1,11 @@
 import pandas as pd
 
+from transform.normalizacion import (
+  limpiar_existencia_serie,
+  normalizar_fecha_iso,
+  normalizar_tipo_movimiento,
+)
+
 
 def transformar_inventario_db(df_inventario_actual, df_movimientos):
   try:
@@ -9,10 +15,10 @@ def transformar_inventario_db(df_inventario_actual, df_movimientos):
     mov = df_movimientos.drop_duplicates(subset=["id"], keep="last").copy()
 
     inv["bodega"] = inv["bodega"].astype(str).str.strip().str.title()
-    inv["existencia"] = pd.to_numeric(inv["existencia"], errors="coerce").fillna(0).astype(int)
+    inv["existencia"] = limpiar_existencia_serie(inv["existencia"])
 
-    mov["fecha"] = pd.to_datetime(mov["fecha"], errors="coerce").dt.strftime("%Y-%m-%d")
-    mov["tipo"] = mov["tipo"].astype(str).str.strip().str.title()
+    mov["fecha"] = normalizar_fecha_iso(mov["fecha"])
+    mov["tipo"] = mov["tipo"].apply(normalizar_tipo_movimiento)
     mov["cantidad"] = pd.to_numeric(mov["cantidad"], errors="coerce").fillna(0).astype(int)
     mov = mov.dropna(subset=["fecha", "producto_id"])
 

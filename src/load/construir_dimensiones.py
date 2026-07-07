@@ -1,5 +1,7 @@
 import pandas as pd
 
+from transform.normalizacion import normalizar_fecha_iso
+
 SUCURSALES = {
   1: "Sucursal Centro",
   2: "Sucursal Norte",
@@ -11,7 +13,8 @@ def _fechas_unicas(*dataframes):
   fechas = set()
   for df, col in dataframes:
     if df is not None and col in df.columns:
-      fechas.update(df[col].dropna().astype(str).tolist())
+      parsed = pd.to_datetime(df[col], errors="coerce")
+      fechas.update(parsed.dropna().dt.strftime("%Y-%m-%d").tolist())
   return sorted(fechas)
 
 
@@ -24,11 +27,11 @@ def construir_dim_tiempo(df_ventas, df_movimientos, df_marketing):
 
   registros = []
   for fecha in fechas:
-    dt = pd.to_datetime(fecha)
+    dt = pd.to_datetime(fecha, errors="coerce")
     registros.append(
       {
         "fecha_key": int(dt.strftime("%Y%m%d")),
-        "fecha": fecha,
+        "fecha": dt.strftime("%Y-%m-%d"),
         "anio": dt.year,
         "mes": dt.month,
         "dia": dt.day,
@@ -38,28 +41,24 @@ def construir_dim_tiempo(df_ventas, df_movimientos, df_marketing):
       }
     )
 
-  return pd.DataFrame(registros)
+  return pd.DataFrame(registros).assign(
+    fecha=lambda df: normalizar_fecha_iso(df["fecha"])
+  )
 
 
 def construir_dim_cliente(df_clientes, df_ventas=None):
-  if df_clientes is None or df_clientes.empty:
-    dim = pd.DataFrame(columns=[
-      "cliente_id_natural", "nombre", "genero", "edad",
-      "departamento", "municipio", "fecha_registro", "segmento_cliente"
-    ])
-  else:
-    dim = df_clientes.copy()
-    dim = dim.rename(columns={"cliente_id": "cliente_id_natural"})
+  dim = df_clientes.copy()
+  dim = dim.rename(columns={"cliente_id": "cliente_id_natural"})
 
-  if df_ventas is not None and not dim.empty:
-    clientes_ventas = set(df_ventas["cliente_id"].dropna().astype(int).unique())
-    clientes_dim = set(dim["cliente_id_natural"].dropna().astype(int).unique())
+  if df_ventas is not None:
+    clientes_ventas = set(df_ventas["cliente_id"].astype(int).unique())
+    clientes_dim = set(dim["cliente_id_natural"].astype(int).unique())
     faltantes = clientes_ventas - clientes_dim
 
     if faltantes:
-      nuevos_clientes = [
+      orphan_df = pd.DataFrame(
         {
-          "cliente_id_natural": cliente_id,
+          "cliente_id_natural": sorted(faltantes),
           "nombre": "Cliente no registrado",
           "genero": "No disponible",
           "edad": 0,
@@ -68,26 +67,8 @@ def construir_dim_cliente(df_clientes, df_ventas=None):
           "fecha_registro": None,
           "segmento_cliente": "No disponible",
         }
-        for cliente_id in sorted(faltantes)
-      ]
-      dim = pd.concat([dim, pd.DataFrame(nuevos_clientes)], ignore_index=True)
-  elif df_ventas is not None and dim.empty:
-    # Si la dimension esta vacia, todos los de ventas son nuevos
-    clientes_ventas = sorted(set(df_ventas["cliente_id"].dropna().astype(int).unique()))
-    nuevos_clientes = [
-      {
-        "cliente_id_natural": cliente_id,
-        "nombre": "Cliente no registrado",
-        "genero": "No disponible",
-        "edad": 0,
-        "departamento": "No disponible",
-        "municipio": "No disponible",
-        "fecha_registro": None,
-        "segmento_cliente": "No disponible",
-      }
-      for cliente_id in clientes_ventas
-    ]
-    dim = pd.DataFrame(nuevos_clientes)
+      )
+      dim = pd.concat([dim, orphan_df], ignore_index=True)
 
   dim.insert(0, "cliente_key", range(1, len(dim) + 1))
   return dim
@@ -141,8 +122,6 @@ def construir_dim_metodo_pago(df_ventas):
 
 
 def construir_dim_campana(df_marketing):
-  if df_marketing is None or df_marketing.empty:
-    return pd.DataFrame(columns=["campana_key", "campana_id_natural", "plataforma"])
   dim = df_marketing[["campana_id", "plataforma"]].copy()
   dim = dim.rename(columns={"campana_id": "campana_id_natural"})
   dim.insert(0, "campana_key", range(1, len(dim) + 1))
